@@ -1,8 +1,38 @@
-const Joi = require('joi')
+const startupDebugger = require('debug')('app:startup')
+const dbDebugger = require('debug')('app:db')
+const config = require('config')
+const Joi = require('joi') // Check valid
 const express = require('express')
-const app = express();
+const app = express()
+const logger = require('./logger')
+const helmet = require('helmet')
+const morgan = require('morgan')
+
+// console.log(`NODE ENV: ${process.env.NODE_ENV}`)
+// console.log(`app: ${app.get('env')}`)
+
+console.log('Application Name: ' + config.get('name'))
+console.log('Mail Server: ' + config.get('mail.host'))
+console.log('Mail Password: ' + config.get('mail.password'))
+
+if(app.get('env') === 'development') {
+    app.use(morgan('tiny'))
+    startupDebugger('Morgan enabled...')
+}
+
+dbDebugger('Connected to the database')
 
 app.use(express.json())
+app.use(express.urlencoded({extended: true}))
+app.use(express.static('public'))
+app.use(helmet())
+
+app.use(logger)
+
+function log(req, res, next) {
+    console.log('Logging...');
+    next();
+}
 
 const courses = [
     {id: 1, name: 'course1'},
@@ -21,8 +51,7 @@ app.get('/api/courses', (req, res) => {
 app.post('/api/courses', (req, res) => {
     const {error} = validateCourse(req.body);
     if(error) {
-        res.status(400).send(error.details[0].message)
-        return ;
+        return res.status(400).send(error.details[0].message)
     }
 
     const course = {
@@ -36,13 +65,13 @@ app.post('/api/courses', (req, res) => {
 // Put 
 app.get('/api/courses/:id', (req, res)=> {
     const course = courses.find(c => c.id === parseInt(req.params.id));
-    if (!course) res.status(404).send('Error course id')
+    if (!course) return res.status(404).send('Error course id')
     res.send(course);
 })
 
 app.put('/api/courses/:id', (req, res)=> {
     const course = courses.find(c => c.id === parseInt(req.params.id));
-    if (!course) res.status(404).send('error course id')
+    if (!course) return res.status(404).send('error course id')
 
     const {error} = validateCourse(req.body);
     if(error) {
